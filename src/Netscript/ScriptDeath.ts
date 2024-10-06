@@ -3,6 +3,12 @@ import { WorkerScript } from "./WorkerScript";
 /**
  * Script death marker.
  *
+ * This is thrown in places where a script has been killed, but some running
+ * code is attempting to invoke one of its ns functions. By extending Error,
+ * users with error handling in their scripts that end up catching this can
+ * more easily detect this error type and ignore it (if desired) or get a stack
+ * trace to help them identify the root cause (if the behaviour is unexpected).
+ *
  * IMPORTANT: the game engine should not base any of it's decisions on the data
  * carried in a ScriptDeath instance.
  *
@@ -10,21 +16,31 @@ import { WorkerScript } from "./WorkerScript";
  * script is killed. Which grants the player access to the class and the ability
  * to construct new instances with arbitrary data.
  */
-export class ScriptDeath {
+export class ScriptDeath extends Error {
   /** Process ID number. */
   pid: number;
 
   /** Filename of the script. */
-  name: string;
+  filename: string;
 
   /** IP Address on which the script was running */
   hostname: string;
 
   constructor(ws: WorkerScript) {
+    // Invoke the Error constructor with a meaningful message
+    const message = `Attempted to invoke an unsupported ns function from a killed process (${ws.name} running on ${ws.hostname} with pid ${ws.pid})`;
+    super(message);
+    // Setting the base Error.name property is important to facilitate easy
+    // detection, since prototype.constructor.name might be minified for them.
+    this.name = "ScriptDeath";
+
+    // Set own properties
     this.pid = ws.pid;
-    this.name = ws.name;
+    this.filename = ws.name;
     this.hostname = ws.hostname;
 
+    // Fix prototype, required when extending Error
+    Object.setPrototypeOf(this, ScriptDeath.prototype);
     Object.freeze(this);
   }
 }
