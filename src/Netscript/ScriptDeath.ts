@@ -3,8 +3,10 @@ import { WorkerScript } from "./WorkerScript";
 /**
  * Script death marker.
  *
- * This is thrown in places where a script has been killed, but some running
- * code is attempting to invoke one of its ns functions. By extending Error,
+ * This is thrown in various places when a script has been killed, as opposed to ending
+ * normally. It can be thrown from exit() and spawn(), which inherently kill the script,
+ * or from an await if the script is killed while waiting for a ns function, or directly
+ * if the script is dead but running code is still trying to execute ns functions. By extending Error,
  * users with error handling in their scripts that end up catching this can
  * more easily detect this error type and ignore it (if desired) or get a stack
  * trace to help them identify the root cause (if the behaviour is unexpected).
@@ -28,7 +30,7 @@ export class ScriptDeath extends Error {
 
   constructor(ws: WorkerScript) {
     // Invoke the Error constructor with a meaningful message
-    const message = `Attempted to invoke an unsupported ns function from a killed process (${ws.name} running on ${ws.hostname} with pid ${ws.pid})`;
+    const message = `NS instance has already been killed (${ws.name} running on ${ws.hostname} with pid ${ws.pid})`;
     super(message);
     // Setting the base Error.name property is important to facilitate easy
     // detection, since prototype.constructor.name might be minified for them.
@@ -39,8 +41,6 @@ export class ScriptDeath extends Error {
     this.filename = ws.name;
     this.hostname = ws.hostname;
 
-    // Fix prototype, required when extending Error
-    Object.setPrototypeOf(this, ScriptDeath.prototype);
     Object.freeze(this);
   }
 }
